@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Box Run </title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+      background: linear-gradient(#444, #222);
+      border: 2px solid #555;
+    }
+    #infoScreen {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      text-align: center;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 10px;
+      display: none; /* Hidden by default */
+    }
+    #scoreBoard {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: white;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="scoreBoard">Score: 0</div>
+  <div id="infoScreen">
+    <h2 id="message">Game Over!</h2>
+    <p id="finalScore">Your Score: 0</p>
+    <button id="restartButton">Restart Game</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Adjust canvas size for a more typical game aspect ratio
+    canvas.width = Math.min(window.innerWidth * 0.8, 200); // Max width of 200px
+    canvas.height = Math.min(window.innerHeight * 0.8, 800); // Max height of 800px
+
+
+    const player = {
+      x: canvas.width / 2 - 25, // Centered
+      y: canvas.height - 70,    // A bit above the bottom
+      width: 35,
+      height: 35,
+      color: 'gold',
+      speed: 7, // Adjusted speed
+      dx: 0 // Change in x for movement
+    };
+
+    let obstacles = [];
+    let score = 0;
+    let gameOver = false;
+    let gameLoopInterval;
+    let obstacleInterval;
+
+    const scoreBoard = document.getElementById('scoreBoard');
+    const infoScreen = document.getElementById('infoScreen');
+    const messageElement = document.getElementById('message');
+    const finalScoreElement = document.getElementById('finalScore');
+    const restartButton = document.getElementById('restartButton');
+
+    function createObstacle() {
+      if (gameOver) return;
+      const minSize = 25;
+      const maxSize = 50;
+      const size = Math.random() * (maxSize - minSize) + minSize;
+      const x = Math.random() * (canvas.width - size);
+      const initialSpeed = 3;
+      const speedIncrease = Math.floor(score / 100); // Obstacles get faster as score increases
+      obstacles.push({
+        x,
+        y: -size,
+        width: size,
+        height: size,
+        speed: initialSpeed + speedIncrease
+      });
+    }
+
+    function updateObstacles() {
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].y += obstacles[i].speed;
+        if (obstacles[i].y > canvas.height) {
+          obstacles.splice(i, 1);
+          if (!gameOver) {
+            score++;
+            updateScoreDisplay();
+          }
+        }
+      }
+    }
+
+    function drawPlayer() {
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
+
+    function drawObstacles() {
+      ctx.fillStyle = 'orangered'; // Changed color for better visibility
+      obstacles.forEach(o => {
+        ctx.fillRect(o.x, o.y, o.width, o.height);
+      });
+    }
+
+    function checkCollision() {
+      for (let o of obstacles) {
+        // Collision detection logic:
+        if (
+          player.x < o.x + o.width &&    // Player's left edge is to the left of obstacle's right edge
+          player.x + player.width > o.x && // Player's right edge is to the right of obstacle's left edge
+          player.y < o.y + o.height &&   // Player's top edge is above obstacle's bottom edge
+          player.y + player.height > o.y   // Player's bottom edge is below obstacle's top edge
+        ) {
+          return true; // Collision detected
+        }
+      }
+      return false; // No collision
+    }
+
+    function updatePlayerPosition() {
+      player.x += player.dx;
+
+      // Keep player within canvas bounds
+      if (player.x < 0) {
+        player.x = 0;
+      }
+      if (player.x + player.width > canvas.width) {
+        player.x = canvas.width - player.width;
+      }
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function updateScoreDisplay() {
+      scoreBoard.textContent = `Score: ${score}`;
+    }
+
+    function showGameOverScreen() {
+      infoScreen.style.display = 'block';
+      messageElement.textContent = 'Game Over!';
+      finalScoreElement.textContent = `Your Score: ${score}`;
+      scoreBoard.style.display = 'none'; // Hide live score
+    }
+
+    function resetGame() {
+      player.x = canvas.width / 2 - 25;
+      player.y = canvas.height - 70;
+      player.dx = 0;
+      obstacles = [];
+      score = 0;
+      gameOver = false;
+      updateScoreDisplay();
+      infoScreen.style.display = 'none';
+      scoreBoard.style.display = 'block'; // Show live score again
+      startGame();
+    }
+
+    function gameLoop() {
+      if (gameOver) {
+        clearInterval(gameLoopInterval);
+        clearInterval(obstacleInterval);
+        showGameOverScreen();
+        return;
+      }
+
+      clearCanvas();
+      updatePlayerPosition();
+      drawPlayer();
+      updateObstacles();
+      drawObstacles();
+
+      if (checkCollision()) {
+        gameOver = true;
+      }
+    }
+
+    function startGame() {
+      // Clear any existing intervals before starting new ones
+      if (gameLoopInterval) clearInterval(gameLoopInterval);
+      if (obstacleInterval) clearInterval(obstacleInterval);
+
+      // Start game loops
+      gameLoopInterval = setInterval(gameLoop, 1000 / 60); // Aim for 60 FPS
+      obstacleInterval = setInterval(createObstacle, 550); // Create an obstacle every 1.5 seconds
+      updateScoreDisplay(); // Initialize score display
+    }
+
+    // Event Listeners for player movement
+    function keyDown(e) {
+      if (e.key === 'ArrowRight' || e.key === 'd') {
+        player.dx = player.speed;
+      } else if (e.key === 'ArrowLeft' || e.key === 'a') {
+        player.dx = -player.speed;
+      }
+    }
+
+    function keyUp(e) {
+      if (
+        e.key === 'ArrowRight' ||
+        e.key === 'd' ||
+        e.key === 'ArrowLeft' ||
+        e.key === 'a'
+      ) {
+        player.dx = 0;
+      }
+    }
+
+    document.addEventListener('keydown', keyDown);
+    document.addEventListener('keyup', keyUp);
+    restartButton.addEventListener('click', resetGame);
+
+    // Initial setup
+    window.addEventListener('resize', () => {
+        // Optional: Adjust canvas on resize, though might need more sophisticated handling
+        // canvas.width = Math.min(window.innerWidth * 0.8, 600);
+        // canvas.height = Math.min(window.innerHeight * 0.8, 800);
+        // player.y = canvas.height - 70; // Adjust player y if canvas height changes
+        // For simplicity, a full game reset on resize might be easier if elements get misplaced.
+        // Or, just set a fixed size initially and let the browser center it.
+    });
+
+
+    // Start the game
+    startGame();
+
+  </script>
+</body>
+</html>
